@@ -34,8 +34,8 @@
   .ph.d{background:linear-gradient(150deg,#0e1f24,#2b5a5f 24%,#9c7b46 68%,#e6c98a 112%)}
   .ph::after{content:"";position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");mix-blend-mode:overlay;opacity:.55}
 
-  /* header — scrolls with the page, not pinned */
-  header{position:relative;background:var(--paper);border-bottom:1px solid var(--line)}
+    /* header — sticks to the top and follows you as you scroll */
+  header{position:sticky;top:0;z-index:1000;background:var(--paper);border-bottom:1px solid var(--line)}
   .bar{display:flex;align-items:center;justify-content:space-between;height:80px}
   .brand img{height:30px;width:auto;display:block}
   nav.menu{display:flex;align-items:center;gap:34px}
