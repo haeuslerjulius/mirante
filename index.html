@@ -311,35 +311,37 @@
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
   document.querySelectorAll('.rv').forEach(el=>io.observe(el));
 
-    (function(){
+  (function(){
     const stage=document.getElementById('stage'); if(!stage) return;
     const veil=document.getElementById('veil'),glow=document.getElementById('glow'),torch=document.getElementById('torch'),hint=document.getElementById('spotHint');
     const canHover=window.matchMedia('(hover:hover)').matches;
-    let userControl=false,t=Math.random()*6,raf=null,px=null,py=null,ease=1;
+    let userControl=false,t=Math.random()*6,raf=null,px=null,py=null,ease=1,hold=0;
+    const EASE_STEP=0.004, HOLD_FRAMES=45;   // gentle accel + short pause after release
 
-    function place(x,y){
+    function place(sx,sy){                    // sx,sy are relative to the wall (scroll-proof)
       const r=stage.getBoundingClientRect();
-      veil.style.setProperty('--x',((x-r.left)/r.width*100)+'%');
-      veil.style.setProperty('--y',((y-r.top)/r.height*100)+'%');
-      glow.style.transform='translate('+(x-r.left)+'px,'+(y-r.top)+'px) translate(-50%,-50%)';
-      torch.style.left=(x-r.left)+'px';torch.style.top=(y-r.top)+'px';
+      veil.style.setProperty('--x',(sx/r.width*100)+'%');
+      veil.style.setProperty('--y',(sy/r.height*100)+'%');
+      glow.style.transform='translate('+sx+'px,'+sy+'px) translate(-50%,-50%)';
+      torch.style.left=sx+'px';torch.style.top=sy+'px';
     }
     function frame(){
       const r=stage.getBoundingClientRect();
       t+=0.011;
-      const tx=r.left+r.width*(0.5+0.34*Math.sin(t));
-      const ty=r.top+r.height*(0.5+0.28*Math.sin(t*1.7));
+      const tx=r.width*(0.5+0.34*Math.sin(t));
+      const ty=r.height*(0.5+0.28*Math.sin(t*1.7));
       if(px===null){ px=tx; py=ty; }
-      if(ease<1) ease=Math.min(1,ease+0.01);   // ramp: slow start, then accelerate
-      const k=0.06*ease;                        // ~0 right after release → dot holds still
+      if(hold>0){ hold--; }                                 // wait a beat where you left it
+      else if(ease<1){ ease=Math.min(1,ease+EASE_STEP); }   // then slowly ramp up to speed
+      const k=0.06*ease;
       px+=(tx-px)*k; py+=(ty-py)*k;
       place(px,py);
       raf=requestAnimationFrame(frame);
     }
     function start(){ if(raf===null && !userControl) raf=requestAnimationFrame(frame); }
     function stop(){ if(raf!==null){ cancelAnimationFrame(raf); raf=null; } }
-    function grab(x,y){ userControl=true; stop(); px=x; py=y; place(x,y); if(hint) hint.style.opacity=.3; }
-    function release(){ userControl=false; ease=0; if(hint) hint.style.opacity=''; start(); }  // resume from here, slowly
+    function grab(cx,cy){ const r=stage.getBoundingClientRect(); userControl=true; stop(); px=cx-r.left; py=cy-r.top; place(px,py); if(hint) hint.style.opacity=.3; }
+    function release(){ userControl=false; ease=0; hold=HOLD_FRAMES; if(hint) hint.style.opacity=''; start(); }
 
     new IntersectionObserver(function(es){
       es.forEach(function(e){
@@ -376,7 +378,7 @@
           const c=e.touches[0];
           if(Math.abs(c.clientX-sx)>8||Math.abs(c.clientY-sy)>8) moved=true;
           e.preventDefault();
-          px=c.clientX; py=c.clientY; place(px,py);
+          const r=stage.getBoundingClientRect(); px=c.clientX-r.left; py=c.clientY-r.top; place(px,py);
         },{passive:false});
         p.addEventListener('touchend',function(e){
           release();
@@ -387,7 +389,6 @@
     document.getElementById('lbclose').addEventListener('click',function(){lb.classList.remove('open');});
     lb.addEventListener('click',function(e){ if(e.target===lb) lb.classList.remove('open'); });
   })();
-
 
 </script>
 </body>
