@@ -311,10 +311,12 @@
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
   document.querySelectorAll('.rv').forEach(el=>io.observe(el));
 
-  (function(){
+   (function(){
     const stage=document.getElementById('stage'); if(!stage) return;
     const veil=document.getElementById('veil'),glow=document.getElementById('glow'),torch=document.getElementById('torch'),hint=document.getElementById('spotHint');
-    let idle=true,t=0,raf;
+    const canHover=window.matchMedia('(hover:hover)').matches;
+    let userControl=false,t=Math.random()*6,raf=null;
+
     function place(x,y){
       const r=stage.getBoundingClientRect();
       veil.style.setProperty('--x',((x-r.left)/r.width*100)+'%');
@@ -324,28 +326,64 @@
     }
     function sweep(){
       t+=0.011;const r=stage.getBoundingClientRect();
-      place(r.left+r.width*(0.5+0.36*Math.sin(t)), r.top+r.height*(0.5+0.30*Math.sin(t*1.7)));
-      if(idle) raf=requestAnimationFrame(sweep);
+      place(r.left+r.width*(0.5+0.34*Math.sin(t)), r.top+r.height*(0.5+0.28*Math.sin(t*1.7)));
+      raf=requestAnimationFrame(sweep);
     }
-    raf=requestAnimationFrame(sweep);
-    function active(e){
-      if(idle){idle=false;cancelAnimationFrame(raf);if(hint)hint.style.opacity=.3;}
-      const p=e.touches?e.touches[0]:e;place(p.clientX,p.clientY);
+    function start(){ if(raf===null && !userControl) raf=requestAnimationFrame(sweep); }
+    function stop(){ if(raf!==null){ cancelAnimationFrame(raf); raf=null; } }
+
+    new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(e.isIntersecting){ if(!userControl) start(); }
+        else { userControl=false; stop(); }
+      });
+    },{threshold:.12}).observe(stage);
+
+    if(hint) hint.textContent = canHover
+      ? 'Beweg die Maus über die Wand — klick ein Bild für Vollbild'
+      : 'Fahr mit dem Finger über die Bilder — tippe für Vollbild';
+
+    // Desktop: mouse moves the light anywhere over the stage
+    if(canHover){
+      stage.addEventListener('pointermove',function(e){
+        userControl=true; stop(); if(hint) hint.style.opacity=.3;
+        place(e.clientX,e.clientY);
+      });
+      stage.addEventListener('pointerleave',function(){
+        userControl=false; if(hint) hint.style.opacity=''; start();
+      });
     }
-    stage.addEventListener('pointermove',active);
-    stage.addEventListener('touchmove',active,{passive:true});
-    stage.addEventListener('pointerleave',function(){idle=true;cancelAnimationFrame(raf);raf=requestAnimationFrame(sweep);});
+
     const lb=document.getElementById('lightbox'),lbimg=document.getElementById('lbimg'),lbcap=document.getElementById('lbcap');
+    function openLB(p){
+      const ph=p.querySelector('.ph');
+      lbimg.className='ph '+ph.className.replace('ph','').trim();
+      lbcap.textContent=p.dataset.cap; lb.classList.add('open');
+    }
     document.querySelectorAll('.wall .pane').forEach(function(p){
       p.style.cursor='pointer';
-      p.addEventListener('click',function(){
-        const ph=p.querySelector('.ph');
-        lbimg.className='ph '+ph.className.replace('ph','').trim();
-        lbcap.textContent=p.dataset.cap;lb.classList.add('open');
-      });
+      if(canHover){
+        p.addEventListener('click',function(){ openLB(p); });
+      } else {
+        let moved=false,sx=0,sy=0;
+        p.addEventListener('touchstart',function(e){
+          const c=e.touches[0]; sx=c.clientX; sy=c.clientY; moved=false;
+          userControl=true; stop(); place(c.clientX,c.clientY); if(hint) hint.style.opacity=.3;
+        },{passive:true});
+        p.addEventListener('touchmove',function(e){
+          const c=e.touches[0];
+          if(Math.abs(c.clientX-sx)>8||Math.abs(c.clientY-sy)>8) moved=true;
+          e.preventDefault();              // lock page scroll only while on a picture
+          place(c.clientX,c.clientY);
+        },{passive:false});
+        p.addEventListener('touchend',function(e){
+          userControl=false; start();
+          if(!moved){ e.preventDefault(); openLB(p); }   // a still tap = fullscreen
+        });
+      }
     });
     document.getElementById('lbclose').addEventListener('click',function(){lb.classList.remove('open');});
-    lb.addEventListener('click',function(e){if(e.target===lb)lb.classList.remove('open');});
+    lb.addEventListener('click',function(e){ if(e.target===lb) lb.classList.remove('open'); });
   })();
 </script>
 </body>
