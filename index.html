@@ -311,11 +311,11 @@
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
   document.querySelectorAll('.rv').forEach(el=>io.observe(el));
 
-   (function(){
+    (function(){
     const stage=document.getElementById('stage'); if(!stage) return;
     const veil=document.getElementById('veil'),glow=document.getElementById('glow'),torch=document.getElementById('torch'),hint=document.getElementById('spotHint');
     const canHover=window.matchMedia('(hover:hover)').matches;
-    let userControl=false,t=Math.random()*6,raf=null;
+    let userControl=false,t=Math.random()*6,raf=null,px=null,py=null,ease=1;
 
     function place(x,y){
       const r=stage.getBoundingClientRect();
@@ -324,13 +324,22 @@
       glow.style.transform='translate('+(x-r.left)+'px,'+(y-r.top)+'px) translate(-50%,-50%)';
       torch.style.left=(x-r.left)+'px';torch.style.top=(y-r.top)+'px';
     }
-    function sweep(){
-      t+=0.011;const r=stage.getBoundingClientRect();
-      place(r.left+r.width*(0.5+0.34*Math.sin(t)), r.top+r.height*(0.5+0.28*Math.sin(t*1.7)));
-      raf=requestAnimationFrame(sweep);
+    function frame(){
+      const r=stage.getBoundingClientRect();
+      t+=0.011;
+      const tx=r.left+r.width*(0.5+0.34*Math.sin(t));
+      const ty=r.top+r.height*(0.5+0.28*Math.sin(t*1.7));
+      if(px===null){ px=tx; py=ty; }
+      if(ease<1) ease=Math.min(1,ease+0.01);   // ramp: slow start, then accelerate
+      const k=0.06*ease;                        // ~0 right after release → dot holds still
+      px+=(tx-px)*k; py+=(ty-py)*k;
+      place(px,py);
+      raf=requestAnimationFrame(frame);
     }
-    function start(){ if(raf===null && !userControl) raf=requestAnimationFrame(sweep); }
+    function start(){ if(raf===null && !userControl) raf=requestAnimationFrame(frame); }
     function stop(){ if(raf!==null){ cancelAnimationFrame(raf); raf=null; } }
+    function grab(x,y){ userControl=true; stop(); px=x; py=y; place(x,y); if(hint) hint.style.opacity=.3; }
+    function release(){ userControl=false; ease=0; if(hint) hint.style.opacity=''; start(); }  // resume from here, slowly
 
     new IntersectionObserver(function(es){
       es.forEach(function(e){
@@ -343,15 +352,9 @@
       ? 'Beweg die Maus über die Wand — klick ein Bild für Vollbild'
       : 'Fahr mit dem Finger über die Bilder — tippe für Vollbild';
 
-    // Desktop: mouse moves the light anywhere over the stage
     if(canHover){
-      stage.addEventListener('pointermove',function(e){
-        userControl=true; stop(); if(hint) hint.style.opacity=.3;
-        place(e.clientX,e.clientY);
-      });
-      stage.addEventListener('pointerleave',function(){
-        userControl=false; if(hint) hint.style.opacity=''; start();
-      });
+      stage.addEventListener('pointermove',function(e){ grab(e.clientX,e.clientY); });
+      stage.addEventListener('pointerleave',release);
     }
 
     const lb=document.getElementById('lightbox'),lbimg=document.getElementById('lbimg'),lbcap=document.getElementById('lbcap');
@@ -367,24 +370,25 @@
       } else {
         let moved=false,sx=0,sy=0;
         p.addEventListener('touchstart',function(e){
-          const c=e.touches[0]; sx=c.clientX; sy=c.clientY; moved=false;
-          userControl=true; stop(); place(c.clientX,c.clientY); if(hint) hint.style.opacity=.3;
+          const c=e.touches[0]; sx=c.clientX; sy=c.clientY; moved=false; grab(c.clientX,c.clientY);
         },{passive:true});
         p.addEventListener('touchmove',function(e){
           const c=e.touches[0];
           if(Math.abs(c.clientX-sx)>8||Math.abs(c.clientY-sy)>8) moved=true;
-          e.preventDefault();              // lock page scroll only while on a picture
-          place(c.clientX,c.clientY);
+          e.preventDefault();
+          px=c.clientX; py=c.clientY; place(px,py);
         },{passive:false});
         p.addEventListener('touchend',function(e){
-          userControl=false; start();
-          if(!moved){ e.preventDefault(); openLB(p); }   // a still tap = fullscreen
+          release();
+          if(!moved){ e.preventDefault(); openLB(p); }
         });
       }
     });
     document.getElementById('lbclose').addEventListener('click',function(){lb.classList.remove('open');});
     lb.addEventListener('click',function(e){ if(e.target===lb) lb.classList.remove('open'); });
   })();
+
+
 </script>
 </body>
 </html>
